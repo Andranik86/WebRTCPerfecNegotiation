@@ -1,0 +1,18 @@
+#connectionActivity {
+    width: 10px;
+    height: 10px;
+    background-color: #000000;
+    border-radius: 50%;
+}
+
+#connectionActivity.error {
+    background-color: #94180a
+}
+
+#connectionActivity.success {
+    background-color: #0a940a;
+}
+
+#connectionActivity.warn {
+    background-color: #d8f70f;
+}

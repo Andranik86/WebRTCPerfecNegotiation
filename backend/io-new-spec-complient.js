@@ -1,3 +1,8 @@
+/* 
+    This is New WebRTC Spec Complient Implementation.
+    Due to node-webrtc not complient with it, you cant use it.
+*/
+
 const path = require('path')
 const fs = require('fs')
 
@@ -6,8 +11,6 @@ const {
 } = require('socket.io')
 const {
     RTCPeerConnection,
-    RTCSessionDescription,
-    RTCIceCandidate,
     nonstandard: {
         RTCVideoSink,
     }
@@ -20,23 +23,18 @@ const io = new socketIo({
     cors: ['*'],
 })
 
-const MEDIA_DIR = path.join(__dirname, '../media')
-
-const peerInfoMap = {}
-let lastPeerIndex = -1
-
 const ICE_SERVERS = [
     {
-        urls: 'stun:stun.l.google.com:19302'
+        urls: 'stun.l.google.com:19302'
     },
     {
-        urls: 'stun:stun2.l.google.com:19302'
+        urls: 'stun2.l.google.com:19302'
     },
     {
-        urls: 'stun:stun3.l.google.com:19302'
+        urls: 'stun3.l.google.com:19302'
     },
     {
-        urls: 'stun:stun4.l.google.com:19302'
+        urls: 'stun4.l.google.com:19302'
     }
 ]
 
@@ -48,14 +46,7 @@ io.on('connect', socket => {
 
     socket.on('description', async ({ uuid, description }) => {
         const peerInfo = peerInfoList.find(peerInfo => peerInfo.uuid === uuid)
-        const {
-            polite,
-            makingOffer,
-            peer,
-            completeIceGathering,
-        } = peerInfo
-        console.log(peer.signalingState)
-
+        const { polite, makingOffer, peer, completeIceGathering } = peerInfo
         const signalingState = peer.signalingState
 
         const offerCollision = (description === 'offer') &&
@@ -64,23 +55,11 @@ io.on('connect', socket => {
 
         if (ignoreOffer) return
 
-        if (offerCollision) {
-            await Promise.all([
-                peer.setLocalDescription({ type: 'rollback' }),
-                peer.setRemoteDescription(description)
-            ])
-        } else {
-            console.log(peer.signalingState)
-            await peer.setRemoteDescription(description)
-        }
-        const iceGatheringPromise = completeIceGathering()
-        console.log('asas')
-
+        await peer.setRemoteDescription(description)
         if (description.type === 'offer') {
-            const answer = await peer.createAnswer()
             await Promise.all([
-                iceGatheringPromise,
-                peer.setLocalDescription(answer)
+                completeIceGathering(),
+                peer.setLocalDescription()
             ])
             socket.emit('description', { description: peer.localDescription })
         }
@@ -91,7 +70,7 @@ io.on('connect', socket => {
 
         const peerInfo = {
             uuid: uuidv4(),
-            peer: new RTCPeerConnection({ iceServers: ICE_SERVERS }),
+            peer: new RTCPeerConnection({iceServers: ICE_SERVERS}),
             polite: defaultPoliteValue,
 
             makingOffer: false,
@@ -101,8 +80,6 @@ io.on('connect', socket => {
                 const observer = createObserver()
 
                 const iceGatheringStateChangeHandler = (e) => {
-                    console.log('iceGahtering')
-                    console.log(peer.iceGatheringState)
                     if (peer.iceGatheringState === 'complete') {
                         peer.removeEventListener('icegatheringstatechange', iceGatheringStateChangeHandler)
                         return observer.res()
@@ -112,32 +89,22 @@ io.on('connect', socket => {
                 return observer.promise
             }
         }
-
-        const {
-            peer,
-            completeIceGathering,
-        } = peerInfo
-        console.log(peer.signalingState)
+        const peer = peerInfo.peer
+        const completeIceGathering = peerInfo.completeIceGathering
         peer.addEventListener('negotiationneeded', async (e) => {
-            console.log('negotiationNeeded')
             peerInfo.makingOffer = true
             try {
-                const offer = await peer.createOffer()
-                const iceGatheringPromise = completeIceGathering()
                 await Promise.all([
-                    peer.setLocalDescription(offer),
-                    iceGatheringPromise
+                    peer.setLocalDescription(),
+                    completeIceGathering()
                 ])
-                socket.emit('description', { uuid: peerInfo.uuid, description: peer.localDescription })
             } catch (err) {
-                console.log('Negotiation Needed Faile: Server')
-            } finally {
-                peerInfo.makingOffer = false
+                return console.log('Negotiation Needed Faile: Server')
             }
+            socket.emit('description', { uuid: peerInfo.uuid, description: peer.localDescription })
+            peerInfo.makingOffer = false
         })
         peer.addEventListener('iceconnectionstatechange', (e) => {
-            console.log('iceconnectionstatechange')
-            console.log(peer.iceConnectionState)
             switch (peer.iceConnectionState) {
                 case 'failed':
                     peer.close()
