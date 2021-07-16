@@ -26,22 +26,23 @@ const peerInfoMap = {}
 let lastPeerIndex = -1
 
 const ICE_SERVERS = [
-    {
-        urls: 'stun:stun.l.google.com:19302'
-    },
-    {
-        urls: 'stun:stun2.l.google.com:19302'
-    },
-    {
-        urls: 'stun:stun3.l.google.com:19302'
-    },
-    {
-        urls: 'stun:stun4.l.google.com:19302'
-    }
+    // {
+    //     urls: 'stun:stun.l.google.com:19302'
+    // },
+    // {
+    //     urls: 'stun:stun2.l.google.com:19302'
+    // },
+    // // {
+    // //     urls: 'stun:stun3.l.google.com:19302'
+    // // },
+    // // {
+    // //     urls: 'stun:stun4.l.google.com:19302'
+    // // }
 ]
 
 const peerInfoList = []
 const defaultPoliteValue = false
+const defaultIceRestartsLimit = 2
 
 io.on('connect', socket => {
     console.log(`Socket connected: ${socket.id}`)
@@ -54,8 +55,6 @@ io.on('connect', socket => {
             peer,
             completeIceGathering,
         } = peerInfo
-        console.log(peer.signalingState)
-
         const signalingState = peer.signalingState
 
         const offerCollision = (description === 'offer') &&
@@ -70,88 +69,123 @@ io.on('connect', socket => {
                 peer.setRemoteDescription(description)
             ])
         } else {
-            console.log(peer.signalingState)
             await peer.setRemoteDescription(description)
         }
-        const iceGatheringPromise = completeIceGathering()
-        console.log('asas')
 
         if (description.type === 'offer') {
             const answer = await peer.createAnswer()
+            const iceGatheringPromise = completeIceGathering()
             await Promise.all([
                 iceGatheringPromise,
                 peer.setLocalDescription(answer)
             ])
-            socket.emit('description', { description: peer.localDescription })
+            socket.emit('description', { uuid, description: peer.localDescription })
         }
     })
 
     socket.on('getUUID', (cb) => {
-        console.log('getUUid')
+        const uuid = uuidv4()
+        console.log(`getUUid: ${uuid}`)
 
         const peerInfo = {
-            uuid: uuidv4(),
-            peer: new RTCPeerConnection({ iceServers: ICE_SERVERS }),
+            uuid,
+            peer: new RTCPeerConnection({ /* iceServers: ICE_SERVERS */ }),
             polite: defaultPoliteValue,
+            iceRestartsLimit: defaultIceRestartsLimit,
 
             makingOffer: false,
-            signalingState: 'new',
-            completeIceGathering() {
+            iceRestartsCount: 0,
+            async completeIceGathering() {
                 const peer = peerInfo.peer
-                const observer = createObserver()
+                const iceGatheringObserver = createObserver()
+                const iceCandidateObserver = createObserver()
 
                 const iceGatheringStateChangeHandler = (e) => {
-                    console.log('iceGahtering')
-                    console.log(peer.iceGatheringState)
                     if (peer.iceGatheringState === 'complete') {
+                        completed = true
                         peer.removeEventListener('icegatheringstatechange', iceGatheringStateChangeHandler)
-                        return observer.res()
+                        console.log('gathering state completed')
+                        return iceGatheringObserver.res()
+                    }
+                }
+                const iceCandidateHandler = ({ candidate }) => {
+                    if (!candidate) {
+                        endOfIce = true
+                        peer.removeEventListener('icecandidate', iceCandidateHandler)
+                        console.log('end-of-candidates received')
+                        return iceCandidateObserver.res()
                     }
                 }
                 peer.addEventListener('icegatheringstatechange', iceGatheringStateChangeHandler)
-                return observer.promise
+                peer.addEventListener('icecandidate', iceCandidateHandler)
+                const finalPromise = await Promise.all([
+                    iceGatheringObserver.promise,
+                    iceCandidateObserver.promise,
+                ])
+                console.log('ICE GATHERING FINISHED')
+                return finalPromise
             }
         }
-
         const {
             peer,
             completeIceGathering,
+            iceRestartsLimit
         } = peerInfo
-        console.log(peer.signalingState)
-        peer.addEventListener('negotiationneeded', async (e) => {
-            console.log('negotiationNeeded')
+
+        async function negotiationNeededHandler(e) {
+            console.log(`negotiationNeeded: ${getIndexByUUID(uuid)}`)
             peerInfo.makingOffer = true
             try {
                 const offer = await peer.createOffer()
                 const iceGatheringPromise = completeIceGathering()
                 await Promise.all([
+                    iceGatheringPromise,
                     peer.setLocalDescription(offer),
-                    iceGatheringPromise
                 ])
-                socket.emit('description', { uuid: peerInfo.uuid, description: peer.localDescription })
+                socket.emit('description', { uuid, description: peer.localDescription })
+                console.log('local description sended')
             } catch (err) {
-                console.log('Negotiation Needed Faile: Server')
+                console.log('Negotiation Needed Faile')
             } finally {
                 peerInfo.makingOffer = false
             }
-        })
-        peer.addEventListener('iceconnectionstatechange', (e) => {
-            console.log('iceconnectionstatechange')
-            console.log(peer.iceConnectionState)
+        }
+
+        function iceConnectionStateChangeHandler(e) {
+            console.log(`iceConnectionStateChangeHandler: ${getIndexByUUID(uuid)}`)
+            console.log(`STATE: ${peer.iceConnectionState}`)
+
             switch (peer.iceConnectionState) {
                 case 'failed':
-                    peer.close()
+                    // Maybe we need to add restart
+                    // But in MDN says that this is due to failed state of some of the transport in connection
+                    // peer.close()
+                    console.log('\n\n')
+                    if (peerInfo.iceRestartsCount < iceRestartsLimit) {
+                        peerInfo.iceRestartsCount++
+                        peer.restartIce()
+                    } else {
+                        peer.close()
+                    }
                     break
                 case 'closed':
-                    const index = peerInfoList.findIndex(currPeerInfo => currPeerInfo.uuid !== peerInfo.uuid)
+                    console.log(`\nConnection CLosed: ${getIndexByUUID(uuid)}, index: ${getIndexByUUID(uuid)}\n\n`)
+                    console.log('Deleting connection from list')
+                    const index = peerInfoList.findIndex(currPeerInfo => currPeerInfo.uuid === peerInfo.uuid)
                     if (index !== -1) {
                         peerInfoList.splice(index, 1)
                     }
+                    peer.removeEventListener('negotiationneeded', negotiationNeededHandler)
+                    peer.removeEventListener('iceconnectionstatechange', iceConnectionStateChangeHandler)
+                    break
+                default:
             }
-        })
+        }
 
+        peer.addEventListener('negotiationneeded', negotiationNeededHandler)
+        peer.addEventListener('iceconnectionstatechange', iceConnectionStateChangeHandler)
         peerInfoList.push(peerInfo)
-        cb({ uuid: peerInfo.uuid })
+        cb({ uuid })
     })
 
     socket.on('disconnect', () => {
@@ -172,4 +206,8 @@ function createObserver() {
         observer.rej = rej
     })
     return observer
+}
+
+function getIndexByUUID(uuid) {
+    return peerInfoList.findIndex(peer => peer.uuid === uuid)
 }

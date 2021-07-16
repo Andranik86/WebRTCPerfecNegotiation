@@ -1,18 +1,22 @@
-#connectionActivity {
+.connectionActivity {
     width: 10px;
     height: 10px;
     background-color: #000000;
     border-radius: 50%;
 }
 
-#connectionActivity.error {
+.connectionActivity.closed {
     background-color: #94180a
 }
 
-#connectionActivity.success {
+.connectionActivity.disconnected {
+    background-color: #94180a
+}
+
+.connectionActivity.connected {
     background-color: #0a940a;
 }
 
-#connectionActivity.warn {
+.connectionActivity.connecting {
     background-color: #d8f70f;
 }
