@@ -25,6 +25,7 @@ class App extends React.Component {
       gatheringState: GATHERING_STATE.NEW,
       negotiationFaileMessage: null,
 
+      startNewConnection: false,
       endOfCandidates: false,
     }
 
@@ -78,7 +79,7 @@ class App extends React.Component {
   }
 
   async componentDidUpdate(_, prevState) {
-    if (this.state.connectionState === CONNECTION_STATE.NEW) {
+    if (this.state.startNewConnection) {
       await this.newPeerConnection()
     } else if (
       this.state.connectionState === CONNECTION_STATE.NEGOTIATING &&

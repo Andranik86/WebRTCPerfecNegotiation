@@ -54,8 +54,13 @@ io.on('connect', socket => {
             makingOffer,
             peer,
             completeIceGathering,
+            offerTimeout,
         } = peerInfo
         const signalingState = peer.signalingState
+
+        if(offerTimeout) {
+            clearTimeout(offerTimeout)
+        }
 
         const offerCollision = (description === 'offer') &&
             (makingOffer || signalingState !== 'stable')
@@ -92,6 +97,8 @@ io.on('connect', socket => {
             peer: new RTCPeerConnection({ /* iceServers: ICE_SERVERS */ }),
             polite: defaultPoliteValue,
             iceRestartsLimit: defaultIceRestartsLimit,
+            lastSdpOffer: null,
+            offerTimeout: null,
 
             makingOffer: false,
             iceRestartsCount: 0,
@@ -143,6 +150,14 @@ io.on('connect', socket => {
                     peer.setLocalDescription(offer),
                 ])
                 socket.emit('description', { uuid, description: peer.localDescription })
+
+                const lastSdpOffer = peer.localDescription
+                peerInfo.lastSdpOffer = lastSdpOffer
+                peerInfo.offerTimeout = setTimeout(() => {
+                    if(peer.signalingState === 'have-local-offer' && lastSdpOffer === peerInfo.lastSdpOffer) {
+                        peer.close()
+                    }
+                }, 3000)
                 console.log('local description sended')
             } catch (err) {
                 console.log('Negotiation Needed Faile')
@@ -152,6 +167,7 @@ io.on('connect', socket => {
         }
 
         function iceConnectionStateChangeHandler(e) {
+            console.log('\n\n')
             console.log(`iceConnectionStateChangeHandler: ${getIndexByUUID(uuid)}`)
             console.log(`STATE: ${peer.iceConnectionState}`)
 
@@ -160,9 +176,9 @@ io.on('connect', socket => {
                     // Maybe we need to add restart
                     // But in MDN says that this is due to failed state of some of the transport in connection
                     // peer.close()
-                    console.log('\n\n')
                     if (peerInfo.iceRestartsCount < iceRestartsLimit) {
                         peerInfo.iceRestartsCount++
+                        console.log(`Restarting Connection: ${peerInfo.iceRestartsCount}/${peerInfo.iceRestartsLimit}`)
                         peer.restartIce()
                     } else {
                         peer.close()
@@ -174,6 +190,9 @@ io.on('connect', socket => {
                     const index = peerInfoList.findIndex(currPeerInfo => currPeerInfo.uuid === peerInfo.uuid)
                     if (index !== -1) {
                         peerInfoList.splice(index, 1)
+                    }
+                    if(peerInfo.offerTimeout) {
+                        clearTimeout(peerInfo.offerTimeout)
                     }
                     peer.removeEventListener('negotiationneeded', negotiationNeededHandler)
                     peer.removeEventListener('iceconnectionstatechange', iceConnectionStateChangeHandler)
