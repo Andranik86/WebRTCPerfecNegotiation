@@ -31,6 +31,7 @@ function ConnectionIndicator(props) {
     }
     return <>
         <div className={activityClassName.join(' ')}></div>
+        {props.negotiationFaileMessage ? <p>Negotiation Faile Message: {props.negotiationFaileMessage}</p> : null}
         <p>{activityText}</p>
     </>
 }

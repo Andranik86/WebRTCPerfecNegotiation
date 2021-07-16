@@ -1,6 +1,6 @@
 {
-  "name": "react-node-start",
-  "version": "1.0.0",
+  "name": "webrtc-video-selfie",
+  "version": "2.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {

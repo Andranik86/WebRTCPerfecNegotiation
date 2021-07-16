@@ -20,3 +20,10 @@
 .connectionActivity.connecting {
     background-color: #d8f70f;
 }
+
+button.error {
+    background-color: red;
+}
+button.success {
+    background-color: green;
+}
