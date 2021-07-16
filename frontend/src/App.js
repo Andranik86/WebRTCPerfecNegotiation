@@ -131,7 +131,7 @@ class App extends React.Component {
         this.setState({ gatheringState: GATHERING_STATE.NEW })
         break
       case 'gathering':
-        console.log('ICE Gathering Started')
+        console.log('ICE Gathering Starteda')
         this.setState({ gatheringState: GATHERING_STATE.GATHERING })
         break
       case 'complete':
