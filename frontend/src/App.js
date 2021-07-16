@@ -125,6 +125,8 @@ class App extends React.Component {
     if (candidate === '' || candidate === null) this.setState({ endOfCandidates: true })
   }
   iceGatheringStateChangeHandler() {
+    console.log('this.peer.iceGatheringState')
+    console.log(this.peer.iceGatheringState)
     switch (this.peer.iceGatheringState) {
       case 'new':
         console.log('ICE Gathering New')

@@ -39,8 +39,9 @@ const ICE_SERVERS = [
 
 const peerInfoList = []
 const defaultPoliteValue = false
-const defaultIceRestartsLimit = 2
+const defaultIceRestartsLimitValue = 2
 const defaultOfferTimeoutValue = 5000
+const defaultBeforeIceGatheringValue = 5000
 
 io.on('connect', socket => {
     console.log(`Socket connected: ${socket.id}`)
@@ -48,20 +49,23 @@ io.on('connect', socket => {
     socket.on('peerClose', ({ uuid }, cb) => {
         const index = peerInfoList.findIndex(currPeerInfo => currPeerInfo.uuid === uuid)
         if (index !== -1) {
+            console.log(`Event peerClose: ${uuid} Closed`)
             peerInfoList[index].peer.close()
-            typeof cb === 'function' && cb({ found: true, success: true })
+            typeof cb === 'function' && cb({ info: { found: true }, success: true })
             return
         }
+        console.log(`Event peerClose: Nothing Exists To Close`)
         typeof cb === 'function' && cb({ found: false, success: true })
         // const [peerInfo] = peerInfoList.splice(index, 1)
     })
 
-    socket.on('description', async ({ uuid, description }) => {
+    socket.on('description', async ({ uuid, description }, cb) => {
         const peerInfo = peerInfoList.find(peerInfo => peerInfo.uuid === uuid)
-        if(!peerInfo) {
-            socket.emit('peerNotExists')
+        if (!peerInfo) {
+            typeof cb === 'function' && cb({ info: { found: false }, success: false })
             return
         }
+        console.log(`Description Type Received: ${description.type}`)
         const {
             polite,
             makingOffer,
@@ -71,28 +75,27 @@ io.on('connect', socket => {
         } = peerInfo
         const signalingState = peer.signalingState
 
-        if (offerTimer) {
-            clearTimeout(offerTimer)
-        }
-
         const offerCollision = (description === 'offer') &&
             (makingOffer || signalingState !== 'stable')
         const ignoreOffer = !polite && offerCollision
 
-        if (ignoreOffer) return
         console.log(`offerCollision: ${offerCollision}`)
-        console.log(`Description Type Received: ${description.type}`)
+        if (ignoreOffer) {
+            console.log('Offer Ignored')
+            return
+        }
+
+        if (offerTimer) {
+            clearTimeout(offerTimer)
+        }
+        
         if (offerCollision) {
-            console.log('setting 11111111')
             await Promise.all([
                 peer.setLocalDescription({ type: 'rollback' }),
                 peer.setRemoteDescription(description)
             ])
-            console.log('setting 22222222')
         } else {
-            console.log('setting1111 11111111')
             await peer.setRemoteDescription(description)
-            console.log('setting2222 22222222')
         }
 
         if (description.type === 'offer') {
@@ -115,21 +118,24 @@ io.on('connect', socket => {
             uuid,
             peer: new RTCPeerConnection({ /* iceServers: ICE_SERVERS */ }),
             polite: defaultPoliteValue,
-            iceRestartsLimit: defaultIceRestartsLimit,
+            
+            iceRestartsLimit: defaultIceRestartsLimitValue,
+            iceRestartsCount: 0,
+            
             offerTimeoutValue: defaultOfferTimeoutValue,
             lastSdpOffer: null,
             offerTimer: null,
-
+            
             makingOffer: false,
-            iceRestartsCount: 0,
-            async completeIceGathering() {
+            
+            async completeIceGathering(timeout) {
                 const peer = peerInfo.peer
                 const iceGatheringObserver = createObserver()
                 const iceCandidateObserver = createObserver()
+                const timeoutObserver = createObserver()
 
                 const iceGatheringStateChangeHandler = (e) => {
                     if (peer.iceGatheringState === 'complete') {
-                        completed = true
                         peer.removeEventListener('icegatheringstatechange', iceGatheringStateChangeHandler)
                         console.log('\ngathering state completed')
                         return iceGatheringObserver.res()
@@ -137,7 +143,6 @@ io.on('connect', socket => {
                 }
                 const iceCandidateHandler = ({ candidate }) => {
                     if (!candidate) {
-                        endOfIce = true
                         peer.removeEventListener('icecandidate', iceCandidateHandler)
                         console.log('end-of-candidates received')
                         return iceCandidateObserver.res()
@@ -145,6 +150,9 @@ io.on('connect', socket => {
                 }
                 peer.addEventListener('icegatheringstatechange', iceGatheringStateChangeHandler)
                 peer.addEventListener('icecandidate', iceCandidateHandler)
+                setTimeout(() => {
+                    timeoutObserver.res()
+                }, peerInfo)
                 const finalPromise = await Promise.all([
                     iceGatheringObserver.promise,
                     iceCandidateObserver.promise,
