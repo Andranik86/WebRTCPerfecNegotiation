@@ -94,7 +94,7 @@ class App extends React.Component {
       this.socket.emit('description', { uuid: this.state.uuid, description: this.peer.localDescription })
       this.setState({ makingOffer: false, endOfCandidates: false })
       console.log(`Local Description Sended: ${this.peer.localDescription.type}`)
-    } else if(this.state.directionChanged && this.state.connectionState === CONNECTION_STATE.NEGOTIATING) {
+    } else if (this.state.directionChanged && this.state.connectionState === CONNECTION_STATE.NEGOTIATING) {
       console.log('direction changed')
       this.socket.emit('description', { uuid: this.state.uuid, description: this.peer.localDescription })
       this.setState({ makingOffer: false, endOfCandidates: false, directionChanged: false })
@@ -187,7 +187,10 @@ class App extends React.Component {
   }
 
   newPeerConnection() {
-    this.socket.emit('getUUID', async ({ uuid }) => {
+    this.socket.emit('getUUID', async ({ data, success }) => {
+      if (!success) return
+      const { uuid } = data
+      
       console.log(`GetUUID: ${uuid}`)
       this.setState({ uuid })
       this.peer = new RTCPeerConnection({ /* iceServers: ICE_SERVERS  */ })
