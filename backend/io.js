@@ -211,20 +211,23 @@ io.on('connect', socket => {
             } = peerInfo
 
             peer.addEventListener('track', ({track}) => {
+                console.log('track')
                 if(!peerInfo.track) {
                     if(track.kind === 'video') {
                         peerInfo.track = track
                         const videoSink = new RTCVideoSink(track)
                         track.addEventListener('ended', () => {
+                            console.log('1111111track ended1111111')
                             videoSink.stop()
                             peerInfo.track = null
                         })
                         track.addEventListener('mute', () => {
-                            console.log('Track muted')
+                            console.log('111111Track muted11111')
                         })
                         track.addEventListener('unmute', () => {
-                            console.log('Track muted')
+                            console.log('111111Track muted111111')
                         })
+                        
                         
                         videoSink.onframe = (frame) => {
                             // console.log(frame)

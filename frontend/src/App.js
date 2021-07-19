@@ -43,6 +43,7 @@ class App extends React.Component {
     this.newPeerConnectionHandler = this.newPeerConnectionHandler.bind(this)
     this.startRecordHandler = this.startRecordHandler.bind(this)
     this.pauseRecordingHandler = this.pauseRecordingHandler.bind(this)
+    this.stopRecordingHandler = this.stopRecordingHandler.bind(this)
 
     this.captureCamera = this.captureCamera.bind(this)
     this.closePeer = this.closePeer.bind(this)
@@ -145,7 +146,6 @@ class App extends React.Component {
         makingOffer: true,
       })
       const iceGatheringPromise = this.completeIceGathering()
-      console.log('ice gathering started')
       await Promise.all([
         iceGatheringPromise,
         peer.setLocalDescription(),
@@ -170,7 +170,7 @@ class App extends React.Component {
       console.log(err)
       this.setState({
         makingOffer: false,
-        negotiationFaileMessage: 'Connection Failed: Due to SDP Offer Timeout',
+        negotiationFaileMessage: 'Connection Failed: Blablabla',
       })
     }
   }
@@ -178,17 +178,15 @@ class App extends React.Component {
     console.log('iceCandidateHandler')
   }
   iceGatheringStateChangeHandler() {
-    console.log('this.peer.iceGatheringState')
-    console.log(this.peer.iceGatheringState)
     switch (this.peer.iceGatheringState) {
       case 'new':
-        console.log('ICE Gathering New')
+        console.log('ICE Gathering: New')
         break
       case 'gathering':
-        console.log('ICE Gathering Started')
+        console.log('ICE Gathering: Gathering')
         break
       case 'complete':
-        console.log('ICE Gathering Completed')
+        console.log('ICE Gathering: Completed')
         break
       default:
     }
@@ -334,14 +332,19 @@ class App extends React.Component {
         return
       }
       if (!this.transceiver) {
+        this.transceiver = await this.peer.addTransceiver('video', {
+          direction: 'inactive',
+          streams: []
+        })
+      } else if (!this.transceiver.sender.track) {
         const mediaStream = await this.captureCamera()
         const [videoTrack] = mediaStream.getVideoTracks()
         this.transceiver = await this.peer.addTransceiver(videoTrack, {
-          direction: 'inactive',
+          direction: 'sendonly',
           streams: [mediaStream]
         })
-      }
-      console.log(`\nStart Recording: ${this.state.uuid}`)
+      } else if ()
+        console.log(`\nStart Recording: ${this.state.uuid}`)
       this.transceiver.direction = 'sendonly'
       this.setState({ recording: true })
     }
@@ -358,14 +361,14 @@ class App extends React.Component {
     }
   }
 
-  async pauseRecordingHandler() {
+  async stopRecordingHandler() {
     if (this.state.streamableConnection && this.state.recording) {
       if (!this.peer || !this.transceiver) {
         return
       }
       console.log(`\nStop Recording: ${this.state.uuid}`)
-      this.transceiver.stop()
-      this.transceiver = null
+      await this.transceiver.sender.replaceTrack(null)
+      console.log(this.transceiver)
       this.setState({ recording: false })
     }
   }
@@ -432,6 +435,7 @@ class App extends React.Component {
         <button onClick={this.newPeerConnectionHandler}>New Peer Connection</button>
         <button onClick={this.startRecordHandler} className={this.state.streamableConnection && !this.state.recording ? "success" : "error"}>Start Recording</button>
         <button onClick={this.pauseRecordingHandler} className={this.state.streamableConnection && this.state.recording ? "success" : "error"}>Pause Recording</button>
+        <button onClick={this.stopRecordingHandler} className={this.state.streamableConnection && this.state.recording ? "success" : "error"}>Pause Recording</button>
         <video autoPlay={true} muted={true} ref={this.videoRef}></video>
       </div>
     );
