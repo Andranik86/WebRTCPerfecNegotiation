@@ -254,8 +254,11 @@ class App extends React.Component {
     if (this.peer && this.peer.iceConnectionState !== 'closed') {
       this.peer.close()
 
-      this.mediaStream.getTracks().forEach(track => track.stop())
-      this.mediaStream = null
+      // this.mediaStream.getTracks().forEach(track => track.stop())
+      // this.mediaStream = null
+      if(this.transceiver) {
+        this.transceiver.stop()
+      }
 
       this.socket.emit('peerClose', { uuid: this.state.uuid })
       return
@@ -322,7 +325,6 @@ class App extends React.Component {
       audio: false,
     })
     videoElem.srcObject = mediaStream
-    this.mediaStream = mediaStream
     return mediaStream
   }
 
@@ -331,21 +333,21 @@ class App extends React.Component {
       if (!this.peer) {
         return
       }
+
       if (!this.transceiver) {
         this.transceiver = await this.peer.addTransceiver('video', {
           direction: 'inactive',
           streams: []
         })
-      } else if (!this.transceiver.sender.track) {
+      }
+      if (!this.transceiver.sender.track) {
         const mediaStream = await this.captureCamera()
         const [videoTrack] = mediaStream.getVideoTracks()
-        this.transceiver = await this.peer.addTransceiver(videoTrack, {
-          direction: 'sendonly',
-          streams: [mediaStream]
-        })
-      } else if ()
-        console.log(`\nStart Recording: ${this.state.uuid}`)
+        this.transceiver.sender.replaceTrack(videoTrack)
+      }
       this.transceiver.direction = 'sendonly'
+
+      console.log(`\nStart Recording: ${this.state.uuid}`)
       this.setState({ recording: true })
     }
   }
@@ -367,8 +369,8 @@ class App extends React.Component {
         return
       }
       console.log(`\nStop Recording: ${this.state.uuid}`)
-      await this.transceiver.sender.replaceTrack(null)
-      console.log(this.transceiver)
+      this.transceiver.stop()
+      this.transceiver = null
       this.setState({ recording: false })
     }
   }
