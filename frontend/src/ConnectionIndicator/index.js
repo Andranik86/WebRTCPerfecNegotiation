@@ -29,6 +29,10 @@ function ConnectionIndicator(props) {
             activityClassName.push('closed')
             break
     }
+    if (props.makingOfferAnswer && props.connectionState !== CONNECTION_STATE.CONNECTED) {
+        activityClassName.push('connecting')
+        activityText = 'Peer Negotiating'
+    }
     return <>
         <div className={activityClassName.join(' ')}></div>
         {props.negotiationFaileMessage ? <p>Negotiation Faile Message: {props.negotiationFaileMessage}</p> : null}

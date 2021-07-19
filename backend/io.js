@@ -40,8 +40,8 @@ const ICE_SERVERS = [
 const peerInfoList = []
 const defaultPoliteValue = false
 const defaultIceRestartsLimitValue = 2
-const defaultOfferTimeoutValue = 5000
-const defaultIceGatheringTimeoutValue = 5000
+const defaultOfferTimeoutValue = 60000000
+const defaultIceGatheringTimeoutValue = 2000
 
 io.on('connect', socket => {
     console.log(`Socket connected: ${socket.id}`)
@@ -137,6 +137,7 @@ io.on('connect', socket => {
             const peerInfo = {
                 uuid,
                 peer: new RTCPeerConnection({ /* iceServers: ICE_SERVERS */ }),
+                track: null,
                 polite: defaultPoliteValue,
 
                 iceRestartsLimit: defaultIceRestartsLimitValue,
@@ -209,6 +210,29 @@ io.on('connect', socket => {
                 offerTimeoutValue,
             } = peerInfo
 
+            peer.addEventListener('track', ({track}) => {
+                if(!peerInfo.track) {
+                    if(track.kind === 'video') {
+                        peerInfo.track = track
+                        const videoSink = new RTCVideoSink(track)
+                        track.addEventListener('ended', () => {
+                            videoSink.stop()
+                            peerInfo.track = null
+                        })
+                        track.addEventListener('mute', () => {
+                            console.log('Track muted')
+                        })
+                        track.addEventListener('unmute', () => {
+                            console.log('Track muted')
+                        })
+                        
+                        videoSink.onframe = (frame) => {
+                            // console.log(frame)
+                        }
+                    }
+                }
+            })
+            
             async function negotiationNeededHandler(e) {
                 console.log(`negotiationNeeded: ${getIndexByUUID(uuid)}`)
                 peerInfo.makingOffer = true

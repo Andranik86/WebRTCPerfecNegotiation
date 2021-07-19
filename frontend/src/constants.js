@@ -19,13 +19,13 @@ const CONNECTION_STATE = {
     DISCONNECTED: 'DISCONNECTED',
     NEGOTIATING: 'NEGOTIATING',
     CLOSED: 'CLOSED'
-  }
-  
-  const GATHERING_STATE = {
+}
+
+const GATHERING_STATE = {
     NEW: 'NEW',
     GATHERING: 'GATHERING',
     COMPLETE: 'COMPLETE',
-  }
+}
 
 export {
     SERVER_URL,
@@ -36,7 +36,7 @@ export {
 
 
 
-/* 
+/*
 
 const PEER_CONNECTTION_STATE = {
     DISCONNECTED: 'DISCONNECTED',

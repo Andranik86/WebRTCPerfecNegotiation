@@ -3,9 +3,11 @@ import ReactDOM from 'react-dom';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+const polite = true
+
 ReactDOM.render(
   <React.StrictMode>
-    <App polite={true}/>
+    <App polite={polite}/>
   </React.StrictMode>,
   document.getElementById('root')
 );
