@@ -276,7 +276,7 @@ class App extends React.Component {
         this.setState({ recording: false, paused: false })
         const [videoTrack] = this.mediaStream.getVideoTracks()
         this.transceiver = await this.peer.addTransceiver(videoTrack, {
-          direction: 'sendonly',
+          direction: 'inactive',
           streams: [this.mediaStream],
         })
       } catch {

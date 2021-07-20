@@ -9,7 +9,7 @@ const { StreamInput } = require('fluent-ffmpeg-multistream')
 const VIDEO_OUTPUT_SIZE = '640x480' // '640x480' // '480x360'
 const VIDEO_OUTPUT_FILE = '/home/andranik_gh/Desktop/WebRTCPerfecNegotiation/media/recording4.webm'
 
-const readStream = fs.createReadStream('/home/andranik_gh/Desktop/WebRTCPerfecNegotiation/media/8c70fe50-31a7-4b1f-ab06-ce5a292bb4eb')
+const readStream = fs.createReadStream('/home/andranik_gh/Desktop/WebRTCPerfecNegotiation/media/72235533-201c-4eec-be3d-d638318b92bc')
 
 ffmpeg()
     .addInput((new StreamInput(readStream)).url)
