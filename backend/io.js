@@ -14,6 +14,7 @@ const {
 } = require('wrtc')
 
 const { v4: uuidv4 } = require('uuid')
+const { PassThrough } = require('stream')
 
 
 const io = new socketIo({
@@ -21,6 +22,9 @@ const io = new socketIo({
 })
 
 const MEDIA_DIR = path.join(__dirname, '../media')
+try {
+    fs.mkdirSync(MEDIA_DIR)
+} catch { }
 
 const ICE_SERVERS = [
     // {
@@ -121,6 +125,17 @@ io.on('connect', socket => {
                 eventProssesingInfo.sdpAnswer = true
                 typeof cb === 'function' && cb({ info: eventProssesingInfo, data: null, success: false })
                 console.log('Answer Sended')
+
+                if (peerInfo.track && peerInfo.track.readyState === 'ended') {
+                    peerInfo.track = null
+                    if (peerInfo.videoSink) {
+                        peerInfo.videoSink.stop()
+                        peerInfo.videoSink = null
+
+                        peerInfo.passThrough.push(null)
+                        peerInfo.passThrough = null
+                    }
+                }
             }
         } catch {
             eventProssesingInfo.serverFailure = true
@@ -138,6 +153,9 @@ io.on('connect', socket => {
                 uuid,
                 peer: new RTCPeerConnection({ /* iceServers: ICE_SERVERS */ }),
                 track: null,
+                videoSink: null,
+                passThrough: null,
+
                 polite: defaultPoliteValue,
 
                 iceRestartsLimit: defaultIceRestartsLimitValue,
@@ -210,31 +228,36 @@ io.on('connect', socket => {
                 offerTimeoutValue,
             } = peerInfo
 
-            peer.addEventListener('track', ({track, streams: [stream]}) => {
+            peer.addEventListener('track', ({ track, streams: [stream] }) => {
                 console.log('track')
-                if(!peerInfo.track) {
-                    if(track.kind === 'video') {
+                if (!peerInfo.track) {
+                    console.log('aaaaaaaaaaaaaaaaaaaaaaa')
+                    console.log('aaaaaaaaaaaaaaaaaaaaaaa')
+                    console.log('aaaaaaaaaaaaaaaaaaaaaaa')
+                    console.log('aaaaaaaaaaaaaaaaaaaaaaa')
+                    console.log('aaaaaaaaaaaaaaaaaaaaaaa')
+                    console.log('aaaaaaaaaaaaaaaaaaaaaaa')
+                    console.log('aaaaaaaaaaaaaaaaaaaaaaa')
+                    if (track.kind === 'video') {
                         peerInfo.track = track
-                        const videoSink = new RTCVideoSink(track)
-                        track.addEventListener('ended', () => {
-                            videoSink.stop()
-                            peerInfo.track = null
-                        })
-                        track.addEventListener('mute', () => {
-                            console.log('111111Track muted11111')
-                        })
-                        track.addEventListener('unmute', () => {
-                            console.log('111111Track muted111111')
-                        })
-                        
-                        
-                        videoSink.onframe = (frame) => {
-                            console.log(frame)
+
+                        peerInfo.videoSink = new RTCVideoSink(track)
+                        peerInfo.passThrough = new PassThrough()
+                        peerInfo.videoSink.onframe = ({ frame: { width, height, data } }) => {
+                            console.log(width, height, )
+                            peerInfo.passThrough.push(Buffer.from(data))
                         }
+
+                        const videoPath = path.join(MEDIA_DIR, `./${uuidv4()}`)
+                        const videoFileWriter = fs.createWriteStream(videoPath)
+                        peerInfo.passThrough.pipe(videoFileWriter)
+                        videoFileWriter.on('finish', () => {
+                            console.log(`Video File Ready: ${videoPath}`)
+                        })
                     }
                 }
             })
-            
+
             async function negotiationNeededHandler(e) {
                 console.log(`negotiationNeeded: ${getIndexByUUID(uuid)}`)
                 peerInfo.makingOffer = true

@@ -6,13 +6,15 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start-front": "npm explore Frontend -- npm start",
-    "start-back": "npm explore Backend -- npm start"
+    "start-back": "npm explore Backend -- npm start",
+    "convert": "npm explore Converter -- npm start"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "Frontend": "file:./frontend",
-    "Backend": "file:./backend"
+    "Backend": "file:./backend",
+    "Converter": "file:./converter"
   }
 }
