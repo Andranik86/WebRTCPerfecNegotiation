@@ -249,22 +249,6 @@ class App extends React.Component {
     }
   }
 
-  closePeer() {
-    console.log('close Peer')
-    if (this.peer && this.peer.iceConnectionState !== 'closed') {
-      this.peer.close()
-
-      // this.mediaStream.getTracks().forEach(track => track.stop())
-      // this.mediaStream = null
-      if(this.transceiver) {
-        this.transceiver.stop()
-      }
-
-      this.socket.emit('peerClose', { uuid: this.state.uuid })
-      return
-    }
-  }
-
   newPeerConnection() {
     this.socket.emit('getUUID', async ({ data, success }) => {
       if (!success) return
@@ -299,6 +283,22 @@ class App extends React.Component {
     })
   }
 
+  closePeer() {
+    console.log('close Peer')
+    if (this.peer && this.peer.iceConnectionState !== 'closed') {
+      this.peer.close()
+
+      // this.mediaStream.getTracks().forEach(track => track.stop())
+      // this.mediaStream = null
+      if(this.transceiver) {
+        this.transceiver.stop()
+      }
+
+      this.socket.emit('peerClose', { uuid: this.state.uuid })
+      return
+    }
+  }
+  
   newPeerConnectionHandler() {
     this.closePeer()
     this.setState({
