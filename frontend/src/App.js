@@ -34,6 +34,7 @@ class App extends React.Component {
 
       streamableConnection: false,
       recording: false,
+      recordingPaused: false,
     }
 
     this.negotiationNeededHandler = this.negotiationNeededHandler.bind(this)
@@ -263,13 +264,13 @@ class App extends React.Component {
       this.peer.addEventListener('icecandidate', this.iceCandidateHandler)
 
       try {
-        const mediaStream = await this.captureCamera()
+        this.mediaStream = await this.captureCamera()
 
-        this.setState({ recording: false })
-        const [videoTrack] = mediaStream.getVideoTracks()
+        this.setState({ recording: false, paused: false })
+        const [videoTrack] = this.mediaStream.getVideoTracks()
         this.transceiver = await this.peer.addTransceiver(videoTrack, {
           direction: 'inactive',
-          streams: [mediaStream]
+          streams: [this.mediaStream]
         })
         // this.transceiver = await this.peer.addTransceiver('video', {
         //   direction: 'inactive',
@@ -288,17 +289,16 @@ class App extends React.Component {
     if (this.peer && this.peer.iceConnectionState !== 'closed') {
       this.peer.close()
 
-      // this.mediaStream.getTracks().forEach(track => track.stop())
-      // this.mediaStream = null
-      if(this.transceiver) {
-        this.transceiver.stop()
-      }
+      this.mediaStream.getTracks().forEach(track => {
+        track.stop()
+      })
+      this.mediaStream = null
 
       this.socket.emit('peerClose', { uuid: this.state.uuid })
       return
     }
   }
-  
+
   newPeerConnectionHandler() {
     this.closePeer()
     this.setState({
@@ -329,49 +329,52 @@ class App extends React.Component {
   }
 
   async startRecordHandler() {
-    if (this.state.streamableConnection && !this.state.recording) {
+    if (this.state.streamableConnection && (!this.state.recording || (this.state.recording && this.state.paused))) {
       if (!this.peer) {
         return
       }
 
-      if (!this.transceiver) {
+      if (!this.transceiver || this.transceiver.direction === 'stopped') {
         this.transceiver = await this.peer.addTransceiver('video', {
           direction: 'inactive',
           streams: []
         })
       }
-      if (!this.transceiver.sender.track) {
-        const mediaStream = await this.captureCamera()
-        const [videoTrack] = mediaStream.getVideoTracks()
+      if (!this.transceiver.sender.track || this.transceiver.sender.track.readyState === 'ended') {
+        this.mediaStream = await this.captureCamera()
+
+        const [videoTrack] = this.mediaStream.getVideoTracks()
         this.transceiver.sender.replaceTrack(videoTrack)
       }
       this.transceiver.direction = 'sendonly'
 
       console.log(`\nStart Recording: ${this.state.uuid}`)
-      this.setState({ recording: true })
+      this.setState({ recording: true, paused: false })
     }
   }
 
   async pauseRecordingHandler() {
-    if (this.state.streamableConnection && this.state.recording) {
-      if (!this.peer || !this.transceiver) {
+    if (this.state.streamableConnection && this.state.recording && !this.state.paused) {
+      if (!this.peer || !this.transceiver || this.transceiver.direction === 'stopped') {
         return
       }
       console.log(`\nPause Recording: ${this.state.uuid}`)
       this.transceiver.direction = 'inactive'
-      this.setState({ recording: false })
+      this.setState({ recording: true, paused: true })
     }
   }
 
   async stopRecordingHandler() {
     if (this.state.streamableConnection && this.state.recording) {
-      if (!this.peer || !this.transceiver) {
+      if (!this.peer || !this.transceiver || this.transceiver.direction === 'stopped') {
         return
       }
       console.log(`\nStop Recording: ${this.state.uuid}`)
-      this.transceiver.stop()
-      this.transceiver = null
-      this.setState({ recording: false })
+      // this.transceiver.direction = 'inactive'
+      this.mediaStream.getTracks().forEach(track => {
+        track.stop()
+      })
+      this.setState({ recording: false, paused: false })
     }
   }
 
@@ -435,9 +438,9 @@ class App extends React.Component {
         <ConnectionIndicator
           connectionState={this.state.connectionState} makingOfferAnswer={this.state.makingOffer || this.state.makingAnswer} negotiationFaileMessage={this.state.negotiationFaileMessage} />
         <button onClick={this.newPeerConnectionHandler}>New Peer Connection</button>
-        <button onClick={this.startRecordHandler} className={this.state.streamableConnection && !this.state.recording ? "success" : "error"}>Start Recording</button>
-        <button onClick={this.pauseRecordingHandler} className={this.state.streamableConnection && this.state.recording ? "success" : "error"}>Pause Recording</button>
-        <button onClick={this.stopRecordingHandler} className={this.state.streamableConnection && this.state.recording ? "success" : "error"}>Pause Recording</button>
+        <button onClick={this.startRecordHandler} className={this.state.streamableConnection && (!this.state.recording || (this.state.recording && this.state.paused))? "success" : "error"}>Start Recording</button>
+        <button onClick={this.pauseRecordingHandler} className={this.state.streamableConnection && this.state.recording && !this.state.paused ? "success" : "error"}>Pause Recording</button>
+        <button onClick={this.stopRecordingHandler} className={this.state.streamableConnection && this.state.recording ? "success" : "error"}>Stop Recording</button>
         <video autoPlay={true} muted={true} ref={this.videoRef}></video>
       </div>
     );

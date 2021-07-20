@@ -210,14 +210,13 @@ io.on('connect', socket => {
                 offerTimeoutValue,
             } = peerInfo
 
-            peer.addEventListener('track', ({track}) => {
+            peer.addEventListener('track', ({track, streams: [stream]}) => {
                 console.log('track')
                 if(!peerInfo.track) {
                     if(track.kind === 'video') {
                         peerInfo.track = track
                         const videoSink = new RTCVideoSink(track)
                         track.addEventListener('ended', () => {
-                            console.log('1111111track ended1111111')
                             videoSink.stop()
                             peerInfo.track = null
                         })
@@ -230,7 +229,7 @@ io.on('connect', socket => {
                         
                         
                         videoSink.onframe = (frame) => {
-                            // console.log(frame)
+                            console.log(frame)
                         }
                     }
                 }
