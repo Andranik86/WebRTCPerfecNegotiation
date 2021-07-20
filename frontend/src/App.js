@@ -14,8 +14,8 @@ import {
 } from './constants'
 
 const defaultIceRestartsLimitValue = 2
-const defaultOfferTimeoutValue = 60000000
-const defaultIceGatheringTimeoutValue = 2000
+const defaultOfferTimeoutValue = 1 * 60 * 1000
+const defaultIceGatheringTimeoutValue = 5000
 
 class App extends React.Component {
   constructor(props) {
@@ -280,13 +280,13 @@ class App extends React.Component {
           streams: [this.mediaStream],
         })
       } catch {
-        this.peerClose()
+        this.closePeer()
       }
     })
   }
 
   closePeer() {
-    console.log('close Peer')
+    console.log('closePeer')
     if (this.peer && this.peer.iceConnectionState !== 'closed') {
       this.peer.close()
 
@@ -295,7 +295,7 @@ class App extends React.Component {
       })
       this.mediaStream = null
 
-      this.socket.emit('peerClose', { uuid: this.state.uuid })
+      this.socket.emit('closePeer', { uuid: this.state.uuid })
       return
     }
   }

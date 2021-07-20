@@ -44,24 +44,24 @@ const ICE_SERVERS = [
 const peerInfoList = []
 const defaultPoliteValue = false
 const defaultIceRestartsLimitValue = 2
-const defaultOfferTimeoutValue = 60000000
-const defaultIceGatheringTimeoutValue = 2000
+const defaultOfferTimeoutValue = 1 * 60 * 1000
+const defaultIceGatheringTimeoutValue = 5000
 
 io.on('connect', socket => {
     console.log(`Socket connected: ${socket.id}`)
 
-    socket.on('peerClose', ({ uuid }, cb) => {
+    socket.on('closePeer', ({ uuid }, cb) => {
         const eventProssesingInfo = { found: false, serverFailure: false }
         try {
             const index = peerInfoList.findIndex(currPeerInfo => currPeerInfo.uuid === uuid)
             if (index !== -1) {
-                console.log(`Event peerClose: ${uuid} Closed`)
+                console.log(`Event closePeer: ${uuid} Closed`)
                 eventProssesingInfo.found = true
                 peerInfoList[index].peer.close()
                 typeof cb === 'function' && cb({ info: eventProssesingInfo, data: null, success: true })
                 return
             }
-            console.log(`Event peerClose: Nothing Exists To Close`)
+            console.log(`Event closePeer: Nothing Exists To Close`)
             typeof cb === 'function' && cb({ info: eventProssesingInfo, data: null, success: true })
             // const [peerInfo] = peerInfoList.splice(index, 1)
         } catch {
@@ -99,7 +99,9 @@ io.on('connect', socket => {
                 eventProssesingInfo.ignored = true
                 typeof cb === 'function' && cb({ info: eventProssesingInfo, data: null, success: false })
                 return
-            } else if (peerInfo.offerTimer) {
+            }
+
+            if (peerInfo.offerTimer) {
                 clearTimeout(peerInfo.offerTimer)
                 peerInfo.offerTimer = null
             }
@@ -127,14 +129,7 @@ io.on('connect', socket => {
                 console.log('Answer Sended')
 
                 if (peerInfo.track && peerInfo.track.readyState === 'ended') {
-                    peerInfo.track = null
-                    if (peerInfo.videoSink) {
-                        peerInfo.videoSink.stop()
-                        peerInfo.videoSink = null
-
-                        peerInfo.passThrough.push(null)
-                        peerInfo.passThrough = null
-                    }
+                    peerInfo.finishVideo()
                 }
             }
         } catch {
@@ -152,9 +147,13 @@ io.on('connect', socket => {
             const peerInfo = {
                 uuid,
                 peer: new RTCPeerConnection({ /* iceServers: ICE_SERVERS */ }),
-                track: null,
-                videoSink: null,
-                passThrough: null,
+                video: {
+                    track: null,
+                    videoSink: null,
+                    passThrough: null,
+                    width: null,
+                    height: null,
+                },
 
                 polite: defaultPoliteValue,
 
@@ -168,6 +167,29 @@ io.on('connect', socket => {
                 offerTimer: null,
 
                 makingOffer: false,
+
+                finishVideo() {
+                    const video = { ...peerInfo.video }
+                    if (video.track) {
+                        video.track.stop()
+                        video.track = null
+                    }
+
+                    if (video.videoSink) {
+                        video.videoSink.stop()
+                        video.videoSink = null
+                    }
+
+                    if (video.passThrough) {
+                        video.passThrough.push(null)
+                        video.passThrough = null
+                    }
+
+                    if (video.width !== null) video.width = null
+                    if (video.height !== null) video.height = null
+
+                    peerInfo.video = video
+                },
 
                 async completeIceGathering(timeout) {
                     const peer = peerInfo.peer
@@ -206,7 +228,7 @@ io.on('connect', socket => {
                     }, timeout !== null && timeout !== undefined ? timeout : peerInfo.iceGatheringTimeout)
 
                     try {
-                        await timeoutObserver.promise
+                        await timeoutObserver.promise // Waiting at least provided milliseconds before marking ice gathering as completed
 
                         await Promise.all([
                             iceGatheringObserver.promise,
@@ -231,20 +253,17 @@ io.on('connect', socket => {
             peer.addEventListener('track', ({ track, streams: [stream] }) => {
                 console.log('track')
                 if (!peerInfo.track) {
-                    console.log('aaaaaaaaaaaaaaaaaaaaaaa')
-                    console.log('aaaaaaaaaaaaaaaaaaaaaaa')
-                    console.log('aaaaaaaaaaaaaaaaaaaaaaa')
-                    console.log('aaaaaaaaaaaaaaaaaaaaaaa')
-                    console.log('aaaaaaaaaaaaaaaaaaaaaaa')
-                    console.log('aaaaaaaaaaaaaaaaaaaaaaa')
-                    console.log('aaaaaaaaaaaaaaaaaaaaaaa')
                     if (track.kind === 'video') {
                         peerInfo.track = track
 
                         peerInfo.videoSink = new RTCVideoSink(track)
                         peerInfo.passThrough = new PassThrough()
                         peerInfo.videoSink.onframe = ({ frame: { width, height, data } }) => {
-                            console.log(width, height, )
+                            if (!peerInfo.video.width) {
+                                peerInfo.video.width = width
+                                peerInfo.video.height = height
+                                console.log(`width x height: ${width}x${height}`)
+                            }
                             peerInfo.passThrough.push(Buffer.from(data))
                         }
 
@@ -294,7 +313,7 @@ io.on('connect', socket => {
                     case 'failed':
                         if (peerInfo.iceRestartsCount < iceRestartsLimit) {
                             peerInfo.iceRestartsCount++
-                            console.log(`Restarting Connection N/MAX: ${peerInfo.iceRestartsCount}/${peerInfo.iceRestartsLimit}`)
+                            console.log(`Restarting Connection: ${peerInfo.iceRestartsCount}/${peerInfo.iceRestartsLimit}(N/MAX)`)
                             peer.restartIce()
                         } else {
                             peer.close()
@@ -307,6 +326,7 @@ io.on('connect', socket => {
                         if (index !== -1) {
                             peerInfoList.splice(index, 1)
                         }
+                        peerInfo.finishVideo()
                         if (peerInfo.offerTimer) {
                             clearTimeout(peerInfo.offerTimer)
                             peerInfo.offerTimer = null

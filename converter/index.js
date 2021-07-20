@@ -1,3 +1,4 @@
+const path = require('path')
 const { PassThrough } = require('stream')
 const fs = require('fs')
 
@@ -6,10 +7,13 @@ const ffmpeg = require('fluent-ffmpeg');
 ffmpeg.setFfmpegPath(ffmpegPath);
 const { StreamInput } = require('fluent-ffmpeg-multistream')
 
-const VIDEO_OUTPUT_SIZE = '640x480' // '640x480' // '480x360'
-const VIDEO_OUTPUT_FILE = '/home/andranik_gh/Desktop/WebRTCPerfecNegotiation/media/recording4.webm'
+const MEDIA_DIR = path.join(__dirname, '../media')
 
-const readStream = fs.createReadStream('/home/andranik_gh/Desktop/WebRTCPerfecNegotiation/media/72235533-201c-4eec-be3d-d638318b92bc')
+const VIDEO_OUTPUT_SIZE = '640x480' // '640x480' // '480x360'
+const VIDEO_OUTPUT_FILE = path.join(MEDIA_DIR, './faf18d6a-c9dd-4ed4-9cea-4a95fd38131b.webm')
+
+
+const readStream = fs.createReadStream(path.join(MEDIA_DIR, './faf18d6a-c9dd-4ed4-9cea-4a95fd38131b'))
 
 ffmpeg()
     .addInput((new StreamInput(readStream)).url)

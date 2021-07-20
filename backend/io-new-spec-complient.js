@@ -140,3 +140,19 @@ function createObserver() {
     })
     return observer
 }
+
+
+
+
+
+// const {
+//     PassThrough
+// } = require('stream')
+
+
+// const p = new PassThrough()
+// p.push('aaa')
+// p.push(null)
+// p.push(null)
+// p.push(null)
+// p.resume()
