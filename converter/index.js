@@ -10,10 +10,10 @@ const { StreamInput } = require('fluent-ffmpeg-multistream')
 const MEDIA_DIR = path.join(__dirname, '../media')
 
 const VIDEO_OUTPUT_SIZE = '640x480' // '640x480' // '480x360'
-const VIDEO_OUTPUT_FILE = path.join(MEDIA_DIR, './faf18d6a-c9dd-4ed4-9cea-4a95fd38131b.webm')
+const VIDEO_OUTPUT_FILE = path.join(MEDIA_DIR, './37c9677d-17d4-4a04-91e5-594618c84856.webm')
 
 
-const readStream = fs.createReadStream(path.join(MEDIA_DIR, './faf18d6a-c9dd-4ed4-9cea-4a95fd38131b'))
+const readStream = fs.createReadStream(path.join(MEDIA_DIR, './37c9677d-17d4-4a04-91e5-594618c84856'))
 
 ffmpeg()
     .addInput((new StreamInput(readStream)).url)

@@ -1,4 +1,3 @@
-// import logo from './logo.svg';
 import React from 'react'
 import './App.css';
 import io from 'socket.io-client'
@@ -10,12 +9,11 @@ import {
   SERVER_URL,
   ICE_SERVERS,
   CONNECTION_STATE,
-  GATHERING_STATE,
 } from './constants'
 
-const defaultIceRestartsLimitValue = 2
-const defaultOfferTimeoutValue = 1 * 60 * 1000
-const defaultIceGatheringTimeoutValue = 5000
+const DEFAULT_ICE_RESTARTS_LIMIT = 2
+const DEFAULT_OFFER_TIMEOUT = 1 * 60 * 1000
+const DEFAULT_ICE_GATHERING_TIMEOUT = 5000
 
 class App extends React.Component {
   constructor(props) {
@@ -105,12 +103,12 @@ class App extends React.Component {
   peer = new RTCPeerConnection({})
   transceiver = null
 
-  iceRestartsLimit = defaultIceRestartsLimitValue
+  iceRestartsLimit = DEFAULT_ICE_RESTARTS_LIMIT
   iceRestartsCount = 0
 
-  iceGatheringTimeout = defaultIceGatheringTimeoutValue
+  iceGatheringTimeout = DEFAULT_ICE_GATHERING_TIMEOUT
 
-  offerTimeoutValue = defaultOfferTimeoutValue
+  offerTimeoutValue = DEFAULT_OFFER_TIMEOUT
   lastSdpOffer = null
   offerTimer = null
 
@@ -133,6 +131,59 @@ class App extends React.Component {
         startNewConnection: false,
       })
       await this.newPeerConnection()
+    }
+  }
+
+  async completeIceGathering(timeout) {
+    const peer = this.peer
+    const iceGatheringTimeout = this.iceGatheringTimeout
+
+    const iceGatheringObserver = runObserver()
+    const iceCandidateObserver = runObserver()
+    const timeoutObserver = runObserver()
+
+    const iceGatheringStateChangeHandler = (e) => {
+      timeoutObserver.res()
+      if (peer.iceGatheringState === 'complete') {
+        peer.removeEventListener('icegatheringstatechange', iceGatheringStateChangeHandler)
+        console.log('\ngathering state completed')
+        return iceGatheringObserver.res()
+      }
+    }
+    const iceCandidateHandler = ({ candidate }) => {
+      timeoutObserver.res()
+      if (!candidate) {
+        peer.removeEventListener('icecandidate', iceCandidateHandler)
+        console.log('end-of-candidates received')
+        return iceCandidateObserver.res()
+      }
+    }
+
+    peer.addEventListener('icegatheringstatechange', iceGatheringStateChangeHandler)
+    peer.addEventListener('icecandidate', iceCandidateHandler)
+    setTimeout(() => {
+      if (timeoutObserver.resolved) {
+        return
+      }
+
+      timeoutObserver.rej()
+      peer.removeEventListener('icegatheringstatechange', iceGatheringStateChangeHandler)
+      peer.removeEventListener('icecandidate', iceCandidateHandler)
+    }, timeout !== null && timeout !== undefined ? timeout : iceGatheringTimeout)
+
+    try {
+      await timeoutObserver.promise
+
+      await Promise.all([
+        iceGatheringObserver.promise,
+        iceCandidateObserver.promise,
+      ])
+      console.log('ICE GATHERING PERFORMED')
+    } catch {
+      console.log('NO ICE GATHERING PERFORMED: Timeout Occured')
+    } finally {
+      console.log('ICE GATHERING COMPLETED\n')
+      return
     }
   }
 
@@ -264,7 +315,7 @@ class App extends React.Component {
 
       console.log(`GetUUID: ${uuid}`)
       this.setState({ uuid })
-      this.peer = new RTCPeerConnection({ /* iceServers: ICE_SERVERS  */ })
+      this.peer = new RTCPeerConnection({ iceServers: ICE_SERVERS  })
       this.peer.addEventListener('negotiationneeded', this.negotiationNeededHandler)
       this.peer.addEventListener('icegatheringstatechange', this.iceGatheringStateChangeHandler)
       this.peer.addEventListener('iceconnectionstatechange', this.iceConnectionStateChangeHandler)
@@ -334,6 +385,12 @@ class App extends React.Component {
       if (!this.peer || !this.transceiver || this.transceiver.direction === 'stopped') {
         return
       }
+      if (!this.transceiver) { // peer.getTransceivers().every(transceiver => transceiver.direction === 'stopped')) {
+        this.transceiver = await this.peer.addTransceiver('video', {
+          direction: 'inactive',
+          streams: [],
+        })
+      }
       if (!this.transceiver.sender.track || this.transceiver.sender.track.readyState === 'ended') {
         this.mediaStream = await this.captureCamera()
 
@@ -372,59 +429,6 @@ class App extends React.Component {
       this.transceiver.stop()
       this.transceiver = null
       this.setState({ recording: false, paused: false })
-    }
-  }
-
-  async completeIceGathering(timeout) {
-    const peer = this.peer
-    const iceGatheringTimeout = this.iceGatheringTimeout
-
-    const iceGatheringObserver = runObserver()
-    const iceCandidateObserver = runObserver()
-    const timeoutObserver = runObserver()
-
-    const iceGatheringStateChangeHandler = (e) => {
-      timeoutObserver.res()
-      if (peer.iceGatheringState === 'complete') {
-        peer.removeEventListener('icegatheringstatechange', iceGatheringStateChangeHandler)
-        console.log('\ngathering state completed')
-        return iceGatheringObserver.res()
-      }
-    }
-    const iceCandidateHandler = ({ candidate }) => {
-      timeoutObserver.res()
-      if (!candidate) {
-        peer.removeEventListener('icecandidate', iceCandidateHandler)
-        console.log('end-of-candidates received')
-        return iceCandidateObserver.res()
-      }
-    }
-
-    peer.addEventListener('icegatheringstatechange', iceGatheringStateChangeHandler)
-    peer.addEventListener('icecandidate', iceCandidateHandler)
-    setTimeout(() => {
-      if (timeoutObserver.resolved) {
-        return
-      }
-
-      timeoutObserver.rej()
-      peer.removeEventListener('icegatheringstatechange', iceGatheringStateChangeHandler)
-      peer.removeEventListener('icecandidate', iceCandidateHandler)
-    }, timeout !== null && timeout !== undefined ? timeout : iceGatheringTimeout)
-
-    try {
-      await timeoutObserver.promise
-
-      await Promise.all([
-        iceGatheringObserver.promise,
-        iceCandidateObserver.promise,
-      ])
-      console.log('ICE GATHERING PERFORMED')
-    } catch {
-      console.log('NO ICE GATHERING PERFORMED: Timeout Occured')
-    } finally {
-      console.log('ICE GATHERING COMPLETED\n')
-      return
     }
   }
 

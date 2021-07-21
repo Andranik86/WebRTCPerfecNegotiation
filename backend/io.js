@@ -27,12 +27,12 @@ try {
 } catch { }
 
 const ICE_SERVERS = [
-    // {
-    //     urls: 'stun:stun.l.google.com:19302'
-    // },
-    // {
-    //     urls: 'stun:stun2.l.google.com:19302'
-    // },
+    {
+        urls: 'stun:stun.l.google.com:19302'
+    },
+    {
+        urls: 'stun:stun2.l.google.com:19302'
+    },
     // // {
     // //     urls: 'stun:stun3.l.google.com:19302'
     // // },
@@ -41,11 +41,12 @@ const ICE_SERVERS = [
     // // }
 ]
 
+const DEFAULT_POLITE = false
+const DEFAULT_ICE_RESTARTS_LIMIT = 2
+const DEFAULT_OFFER_TIMEOUT = 1 * 60 * 1000
+const DEFAULT_ICE_GATHERING_TIMEOUT = 5000
+
 const peerInfoList = []
-const defaultPoliteValue = false
-const defaultIceRestartsLimitValue = 2
-const defaultOfferTimeoutValue = 1 * 60 * 1000
-const defaultIceGatheringTimeoutValue = 5000
 
 io.on('connect', socket => {
     console.log(`Socket connected: ${socket.id}`)
@@ -128,7 +129,7 @@ io.on('connect', socket => {
                 typeof cb === 'function' && cb({ info: eventProssesingInfo, data: null, success: false })
                 console.log('Answer Sended')
 
-                if (peerInfo.track && peerInfo.track.readyState === 'ended') {
+                if (peerInfo.video.track && peerInfo.video.track.readyState === 'ended') {
                     peerInfo.finishVideo()
                 }
             }
@@ -146,7 +147,7 @@ io.on('connect', socket => {
 
             const peerInfo = {
                 uuid,
-                peer: new RTCPeerConnection({ /* iceServers: ICE_SERVERS */ }),
+                peer: new RTCPeerConnection({ iceServers: ICE_SERVERS }),
                 video: {
                     track: null,
                     videoSink: null,
@@ -155,14 +156,14 @@ io.on('connect', socket => {
                     height: null,
                 },
 
-                polite: defaultPoliteValue,
+                polite: DEFAULT_POLITE,
 
-                iceRestartsLimit: defaultIceRestartsLimitValue,
+                iceRestartsLimit: DEFAULT_ICE_RESTARTS_LIMIT,
                 iceRestartsCount: 0,
 
-                iceGatheringTimeout: defaultIceGatheringTimeoutValue,
+                iceGatheringTimeout: DEFAULT_ICE_GATHERING_TIMEOUT,
 
-                offerTimeoutValue: defaultOfferTimeoutValue,
+                offerTimeoutValue: DEFAULT_OFFER_TIMEOUT,
                 lastSdpOffer: null,
                 offerTimer: null,
 
@@ -252,24 +253,24 @@ io.on('connect', socket => {
 
             peer.addEventListener('track', ({ track, streams: [stream] }) => {
                 console.log('track')
-                if (!peerInfo.track) {
+                if (!peerInfo.video.track) {
                     if (track.kind === 'video') {
-                        peerInfo.track = track
+                        peerInfo.video.track = track
 
-                        peerInfo.videoSink = new RTCVideoSink(track)
-                        peerInfo.passThrough = new PassThrough()
-                        peerInfo.videoSink.onframe = ({ frame: { width, height, data } }) => {
+                        peerInfo.video.videoSink = new RTCVideoSink(track)
+                        peerInfo.video.passThrough = new PassThrough()
+                        peerInfo.video.videoSink.onframe = ({ frame: { width, height, data } }) => {
                             if (!peerInfo.video.width) {
                                 peerInfo.video.width = width
                                 peerInfo.video.height = height
                                 console.log(`width x height: ${width}x${height}`)
                             }
-                            peerInfo.passThrough.push(Buffer.from(data))
+                            peerInfo.video.passThrough.push(Buffer.from(data))
                         }
 
                         const videoPath = path.join(MEDIA_DIR, `./${uuidv4()}`)
                         const videoFileWriter = fs.createWriteStream(videoPath)
-                        peerInfo.passThrough.pipe(videoFileWriter)
+                        peerInfo.video.passThrough.pipe(videoFileWriter)
                         videoFileWriter.on('finish', () => {
                             console.log(`Video File Ready: ${videoPath}`)
                         })
