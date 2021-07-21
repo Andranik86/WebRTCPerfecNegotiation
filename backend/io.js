@@ -6,8 +6,6 @@ const {
 } = require('socket.io')
 const {
     RTCPeerConnection,
-    RTCSessionDescription,
-    RTCIceCandidate,
     nonstandard: {
         RTCVideoSink,
     }
@@ -16,6 +14,11 @@ const {
 const { v4: uuidv4 } = require('uuid')
 const { PassThrough } = require('stream')
 
+
+const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+const ffmpeg = require('fluent-ffmpeg');
+ffmpeg.setFfmpegPath(ffmpegPath);
+const { StreamInput } = require('fluent-ffmpeg-multistream')
 
 const io = new socketIo({
     cors: ['*'],
@@ -259,21 +262,39 @@ io.on('connect', socket => {
 
                         peerInfo.video.videoSink = new RTCVideoSink(track)
                         peerInfo.video.passThrough = new PassThrough()
+                        const videoPath = path.join(MEDIA_DIR, `./${uuidv4()}.webm`)
+
                         peerInfo.video.videoSink.onframe = ({ frame: { width, height, data } }) => {
+                            peerInfo.video.passThrough.push(Buffer.from(data))
                             if (!peerInfo.video.width) {
+                                console.log(`{width}x{height}: ${width}x${height}`)
+
                                 peerInfo.video.width = width
                                 peerInfo.video.height = height
-                                console.log(`width x height: ${width}x${height}`)
-                            }
-                            peerInfo.video.passThrough.push(Buffer.from(data))
-                        }
 
-                        const videoPath = path.join(MEDIA_DIR, `./${uuidv4()}`)
-                        const videoFileWriter = fs.createWriteStream(videoPath)
-                        peerInfo.video.passThrough.pipe(videoFileWriter)
-                        videoFileWriter.on('finish', () => {
-                            console.log(`Video File Ready: ${videoPath}`)
-                        })
+
+                                ffmpeg()
+                                    .addInput(new StreamInput(peerInfo.video.passThrough).url)
+                                    .addInputOptions([
+                                        '-f', 'rawvideo',
+                                        '-pix_fmt', 'yuv420p',
+                                        '-s', `${peerInfo.video.width}x${peerInfo.video.height}`,
+                                        '-r', '30',
+                                    ])
+                                    .output(videoPath)
+                                    .on('start', () => {
+                                        console.log('Start recording >> ', videoPath)
+                                    })
+                                    .on('end', () => {
+                                        console.log('Stop recording >> ', videoPath)
+
+                                    })
+                                    .on('error', () => {
+                                        console.log('Viode Recording FFMPEG ERROR Occured')
+                                    })
+                                    .run()
+                            }
+                        }
                     }
                 }
             })
