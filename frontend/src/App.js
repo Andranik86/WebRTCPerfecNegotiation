@@ -315,7 +315,7 @@ class App extends React.Component {
 
       console.log(`GetUUID: ${uuid}`)
       this.setState({ uuid })
-      this.peer = new RTCPeerConnection({ iceServers: ICE_SERVERS  })
+      this.peer = new RTCPeerConnection({ iceServers: ICE_SERVERS })
       this.peer.addEventListener('negotiationneeded', this.negotiationNeededHandler)
       this.peer.addEventListener('icegatheringstatechange', this.iceGatheringStateChangeHandler)
       this.peer.addEventListener('iceconnectionstatechange', this.iceConnectionStateChangeHandler)
@@ -330,7 +330,8 @@ class App extends React.Component {
           direction: 'inactive',
           streams: [this.mediaStream],
         })
-      } catch {
+      } catch (err) {
+        console.log(err)
         this.closePeer()
       }
     })
@@ -341,10 +342,12 @@ class App extends React.Component {
     if (this.peer && this.peer.iceConnectionState !== 'closed') {
       this.peer.close()
 
-      this.mediaStream.getTracks().forEach(track => {
-        track.stop()
-      })
-      this.mediaStream = null
+      if (this.mediaStream) {
+        this.mediaStream.getTracks().forEach(track => {
+          track.stop()
+        })
+        this.mediaStream = null
+      }
 
       this.socket.emit('closePeer', { uuid: this.state.uuid })
       return
