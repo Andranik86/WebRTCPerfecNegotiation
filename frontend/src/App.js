@@ -32,7 +32,7 @@ class App extends React.Component {
 
       streamableConnection: false,
       recording: false,
-      recordingPaused: false,
+      paused: false,
 
       logs: [],
     }
@@ -47,6 +47,7 @@ class App extends React.Component {
     this.stopRecordingHandler = this.stopRecordingHandler.bind(this)
 
     this.log = this.log.bind(this)
+    this.clearLogs = this.clearLogs.bind(this)
     this.captureCamera = this.captureCamera.bind(this)
     this.closePeer = this.closePeer.bind(this)
     this.completeIceGathering = this.completeIceGathering.bind(this)
@@ -83,14 +84,24 @@ class App extends React.Component {
           makingOffer: false,
         })
       }
-      await peer.setRemoteDescription(description)
+
+      if (offerCollision) {
+        await Promise.all([
+          peer.setLocalDescription({ type: 'rollback' }),
+          peer.setRemoteDescription(description)
+        ])
+      } else {
+        await peer.setRemoteDescription(description)
+      }
       this.log(`Remote Description Added: ${description.type}`)
 
       if (description.type === 'offer') {
+        const answer = await peer.createAnswer()
         const iceGatheringPromise = this.completeIceGathering()
+        this.log('Trying to Add Local Description and find ice candidates')
         await Promise.all([
           iceGatheringPromise,
-          peer.setLocalDescription(),
+          peer.setLocalDescription(answer),
         ])
         this.log('Local Description Added: Answer')
         this.setState({
@@ -215,9 +226,10 @@ class App extends React.Component {
       this.log('blue')
       const iceGatheringPromise = this.completeIceGathering()
       this.log('bluetooth')
+      const offer = await peer.createOffer()
       await Promise.all([
         iceGatheringPromise,
-        peer.setLocalDescription(),
+        peer.setLocalDescription(offer),
       ])
       this.log('Local Description Added: Offer')
       socket.emit('description', { uuid, description: peer.localDescription })
@@ -352,6 +364,11 @@ class App extends React.Component {
     console.log(message)
     this.setState((state) => ({ ...state, logs: [...state.logs, message.trim()] }))
   }
+  clearLogs() {
+    this.setState({
+      logs: []
+    })
+  }
 
   closePeer() {
     this.log('closePeer')
@@ -445,8 +462,14 @@ class App extends React.Component {
       // if (this.transceiver.sender.track) {
       //   this.transceiver.sender.track.stop()
       // }
-      this.transceiver.stop()
-      this.transceiver = null
+      try {
+        this.transceiver.direction = 'inactive'
+        // this.transceiver.sender.track.stop()
+        this.transceiver.stop()
+        this.transceiver = null
+      } catch (err) {
+        this.log(err.message)
+      }
       this.setState({ recording: false, paused: false })
     }
   }
@@ -464,8 +487,11 @@ class App extends React.Component {
           <button onClick={this.stopRecordingHandler} className={this.state.streamableConnection && this.state.recording ? "success" : "error"}>Stop Recording</button>
           <video autoPlay={true} muted={true} ref={this.videoRef}></video>
         </div>
-        <p>:logs:</p>
-        {this.state.logs.map((msg, i) => <p key={i}>{i}: {msg}</p>)}
+        <div>
+          <button onClick={this.clearLogs}>Clear Logs</button>
+          <p>:logs:</p>
+          {this.state.logs.map((msg, i) => <p key={i}>{i}: {msg}</p>)}
+        </div>
       </div>
     );
   }

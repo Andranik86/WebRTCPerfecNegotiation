@@ -127,12 +127,12 @@ io.on('connect', socket => {
             if (description.type === 'offer') {
                 const answer = await peer.createAnswer()
                 const iceGatheringPromise = completeIceGathering()
-                console.log('Trying to add local description and find ice candidates')
+                console.log('Trying to Add Local Description and find ice candidates')
                 await Promise.all([
                     iceGatheringPromise,
                     peer.setLocalDescription(answer)
                 ])
-                console.log('Local Description Added')
+                console.log('Local Description Added: Answer')
                 socket.emit('description', { uuid, description: peer.localDescription })
                 eventProssesingInfo.sdpAnswer = true
                 typeof cb === 'function' && cb({ info: eventProssesingInfo, data: null, success: false })

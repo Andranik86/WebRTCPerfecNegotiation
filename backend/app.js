@@ -10,7 +10,7 @@ app.use(cors({
     origin:  ['https://e754bb56af4e.ngrok.io', 'https://f7a84800a675.ngrok.io', '*',]
 }))
 app.use(bodyParser.json())
-app.use(express.static(path.join(__dirname, './statics')))
+app.use(express.static(path.join(__dirname, './build')))
 
 app.get('/', (req, res, next) => {
     res.send({
