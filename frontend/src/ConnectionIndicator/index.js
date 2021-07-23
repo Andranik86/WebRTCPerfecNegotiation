@@ -15,7 +15,7 @@ function ConnectionIndicator(props) {
             break
         case CONNECTION_STATE.NEGOTIATING:
             activityClassName.push('connecting')
-            activityText = 'Peer Negotiating'
+            activityText = `Peer Negotiating: ${CONNECTION_STATE.NEGOTIATING}`
             break
         case CONNECTION_STATE.CONNECTED:
             activityClassName.push('connected')
@@ -31,7 +31,7 @@ function ConnectionIndicator(props) {
     }
     if (props.makingOfferAnswer && props.connectionState !== CONNECTION_STATE.CONNECTED) {
         activityClassName.push('connecting')
-        activityText = 'Peer Negotiating'
+        activityText = `Peer Negotiating: ${props.connectionState}`
     }
     return <>
         <div className={activityClassName.join(' ')}></div>

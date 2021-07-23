@@ -12,7 +12,7 @@ import {
 } from './constants'
 
 const DEFAULT_ICE_RESTARTS_LIMIT = 2
-const DEFAULT_OFFER_TIMEOUT = 1 * 60 * 1000
+const DEFAULT_OFFER_TIMEOUT = 10 * 60 * 1000
 const DEFAULT_ICE_GATHERING_TIMEOUT = 5000
 
 class App extends React.Component {
@@ -33,6 +33,8 @@ class App extends React.Component {
       streamableConnection: false,
       recording: false,
       recordingPaused: false,
+
+      logs: [],
     }
 
     this.negotiationNeededHandler = this.negotiationNeededHandler.bind(this)
@@ -44,17 +46,18 @@ class App extends React.Component {
     this.pauseRecordingHandler = this.pauseRecordingHandler.bind(this)
     this.stopRecordingHandler = this.stopRecordingHandler.bind(this)
 
+    this.log = this.log.bind(this)
     this.captureCamera = this.captureCamera.bind(this)
     this.closePeer = this.closePeer.bind(this)
     this.completeIceGathering = this.completeIceGathering.bind(this)
     this.newPeerConnection = this.newPeerConnection.bind(this)
 
     this.socket.on('connect', () => {
-      console.log(`Socket connected: ${this.socket.id}`)
+      this.log(`Socket connected: ${this.socket.id}`)
     })
 
     this.socket.on('description', async ({ uuid, description }) => {
-      console.log(`Description Rescived: ${uuid}`)
+      this.log(`Description Rescived: ${uuid}`)
       const socket = this.socket
       const peer = this.peer
 
@@ -62,7 +65,7 @@ class App extends React.Component {
         (this.state.makingOffer || peer.signalingState !== 'stable')
       const ignoreOffer = !this.polite && offerCollision
 
-      console.log(`OfferCollision: ${offerCollision}`)
+      this.log(`OfferCollision: ${offerCollision}`)
       if (ignoreOffer) return
 
       if (this.offerTimer) {
@@ -81,7 +84,7 @@ class App extends React.Component {
         })
       }
       await peer.setRemoteDescription(description)
-      console.log(`Remote Description Added: ${description.type}`)
+      this.log(`Remote Description Added: ${description.type}`)
 
       if (description.type === 'offer') {
         const iceGatheringPromise = this.completeIceGathering()
@@ -89,12 +92,12 @@ class App extends React.Component {
           iceGatheringPromise,
           peer.setLocalDescription(),
         ])
-        console.log('Local Description Added: Answer')
+        this.log('Local Description Added: Answer')
         this.setState({
           makingAnswer: false,
         })
         socket.emit('description', { uuid, description: peer.localDescription })
-        console.log('Answer Sended')
+        this.log('Answer Sended')
       }
     })
   }
@@ -112,13 +115,18 @@ class App extends React.Component {
   lastSdpOffer = null
   offerTimer = null
 
-  socket = io(SERVER_URL)
+  socket = io(/* SERVER_URL, */ /* {
+    // withCredentials: false,
+    // mode: 'cors',
+    // origin: '*',
+    // transport: ['websocket']
+  } */)
 
   videoRef = React.createRef()
 
 
   async componentDidMount() {
-    console.log('ComponentDidMount')
+    this.log('ComponentDidMount')
     this.setState({
       startNewConnection: true,
     })
@@ -146,7 +154,7 @@ class App extends React.Component {
       timeoutObserver.res()
       if (peer.iceGatheringState === 'complete') {
         peer.removeEventListener('icegatheringstatechange', iceGatheringStateChangeHandler)
-        console.log('\ngathering state completed')
+        this.log('\ngathering state completed')
         return iceGatheringObserver.res()
       }
     }
@@ -154,7 +162,7 @@ class App extends React.Component {
       timeoutObserver.res()
       if (!candidate) {
         peer.removeEventListener('icecandidate', iceCandidateHandler)
-        console.log('end-of-candidates received')
+        this.log('end-of-candidates received')
         return iceCandidateObserver.res()
       }
     }
@@ -178,18 +186,18 @@ class App extends React.Component {
         iceGatheringObserver.promise,
         iceCandidateObserver.promise,
       ])
-      console.log('ICE GATHERING PERFORMED')
+      this.log('ICE GATHERING PERFORMED')
     } catch {
-      console.log('NO ICE GATHERING PERFORMED: Timeout Occured')
+      this.log('NO ICE GATHERING PERFORMED: Timeout Occured')
     } finally {
-      console.log('ICE GATHERING COMPLETED\n')
+      this.log('ICE GATHERING COMPLETED\n')
       return
     }
   }
 
   async negotiationNeededHandler() {
     const uuid = this.state.uuid
-    console.log('negotiationNeededHandler')
+    this.log('negotiationNeededHandler')
     const peer = this.peer
     const socket = this.socket
 
@@ -199,25 +207,27 @@ class App extends React.Component {
         streams: [],
       })
     }
-
+    this.log('red')
     try {
       this.setState({
         makingOffer: true,
       })
+      this.log('blue')
       const iceGatheringPromise = this.completeIceGathering()
+      this.log('bluetooth')
       await Promise.all([
         iceGatheringPromise,
         peer.setLocalDescription(),
       ])
-      console.log('Local Description Added: Offer')
+      this.log('Local Description Added: Offer')
       socket.emit('description', { uuid, description: peer.localDescription })
-      console.log('Offer Sended')
+      this.log('Offer Sended')
 
       const lastSdpOffer = peer.localDescription
       this.lastSdpOffer = lastSdpOffer
       this.offerTimer = setTimeout(() => {
         if (peer.signalingState === 'have-local-offer' && lastSdpOffer === this.lastSdpOffer) {
-          console.log(`Closing Connection: ${uuid} due to SDP Offer Timeout`)
+          this.log(`Closing Connection: ${uuid} due to SDP Offer Timeout`)
           peer.close()
           this.setState({
             makingOffer: false,
@@ -226,7 +236,7 @@ class App extends React.Component {
         }
       }, this.offerTimeoutValue)
     } catch (err) {
-      console.log(err)
+      this.log(err.message)
       this.setState({
         makingOffer: false,
         negotiationFaileMessage: 'Connection Failed: Blablabla',
@@ -234,26 +244,26 @@ class App extends React.Component {
     }
   }
   iceCandidateHandler({ candidate }) {
-    console.log('iceCandidateHandler')
+    this.log('iceCandidateHandler')
   }
   iceGatheringStateChangeHandler() {
     switch (this.peer.iceGatheringState) {
       case 'new':
-        console.log('ICE Gathering: New')
+        this.log('ICE Gathering: New')
         break
       case 'gathering':
-        console.log('ICE Gathering: Gathering')
+        this.log('ICE Gathering: Gathering')
         break
       case 'complete':
-        console.log('ICE Gathering: Completed')
+        this.log('ICE Gathering: Completed')
         break
       default:
     }
   }
 
   iceConnectionStateChangeHandler() {
-    console.log(`\niceConnectionStateChangeHandler: ${this.state.uuid}`)
-    console.log(`STATE: ${this.peer.iceConnectionState}\n`)
+    this.log(`\niceConnectionStateChangeHandler: ${this.state.uuid}`)
+    this.log(`STATE: ${this.peer.iceConnectionState}\n`)
     switch (this.peer.iceConnectionState) {
       case 'checking':
         this.setState({
@@ -313,7 +323,7 @@ class App extends React.Component {
       if (!success) return
       const { uuid } = data
 
-      console.log(`GetUUID: ${uuid}`)
+      this.log(`GetUUID: ${uuid}`)
       this.setState({ uuid })
       this.peer = new RTCPeerConnection({ iceServers: ICE_SERVERS })
       this.peer.addEventListener('negotiationneeded', this.negotiationNeededHandler)
@@ -331,14 +341,20 @@ class App extends React.Component {
           streams: [this.mediaStream],
         })
       } catch (err) {
-        console.log(err)
+        this.log(err.message)
         this.closePeer()
       }
     })
   }
 
+  log(message) {
+    message += ''
+    console.log(message)
+    this.setState((state) => ({ ...state, logs: [...state.logs, message.trim()] }))
+  }
+
   closePeer() {
-    console.log('closePeer')
+    this.log('closePeer')
     if (this.peer && this.peer.iceConnectionState !== 'closed') {
       this.peer.close()
 
@@ -403,7 +419,7 @@ class App extends React.Component {
 
       this.transceiver.direction = 'sendonly'
 
-      console.log(`\nStart Recording: ${this.state.uuid}`)
+      this.log(`\nStart Recording: ${this.state.uuid}`)
       this.setState({ recording: true, paused: false })
     }
   }
@@ -413,7 +429,7 @@ class App extends React.Component {
       if (!this.peer || !this.transceiver || this.transceiver.direction === 'stopped') {
         return
       }
-      console.log(`\nPause Recording: ${this.state.uuid}`)
+      this.log(`\nPause Recording: ${this.state.uuid}`)
       this.transceiver.direction = 'inactive'
       this.setState({ recording: true, paused: true })
     }
@@ -424,7 +440,7 @@ class App extends React.Component {
       if (!this.peer || !this.transceiver || this.transceiver.direction === 'stopped') {
         return
       }
-      console.log(`\nStop Recording: ${this.state.uuid}`)
+      this.log(`\nStop Recording: ${this.state.uuid}`)
       // this.transceiver.direction = 'inactive'
       // if (this.transceiver.sender.track) {
       //   this.transceiver.sender.track.stop()
@@ -436,16 +452,20 @@ class App extends React.Component {
   }
 
   render() {
-    // console.log(this.state)
+    // this.log(this.state)
     return (
       <div className="App">
-        <ConnectionIndicator
-          connectionState={this.state.connectionState} makingOfferAnswer={this.state.makingOffer || this.state.makingAnswer} negotiationFaileMessage={this.state.negotiationFaileMessage} />
-        <button onClick={this.newPeerConnectionHandler}>New Peer Connection</button>
-        <button onClick={this.startRecordHandler} className={this.state.streamableConnection && (!this.state.recording || (this.state.recording && this.state.paused)) ? "success" : "error"}>Start Recording</button>
-        <button onClick={this.pauseRecordingHandler} className={this.state.streamableConnection && this.state.recording && !this.state.paused ? "success" : "error"}>Pause Recording</button>
-        <button onClick={this.stopRecordingHandler} className={this.state.streamableConnection && this.state.recording ? "success" : "error"}>Stop Recording</button>
-        <video autoPlay={true} muted={true} ref={this.videoRef}></video>
+        <div>
+          <ConnectionIndicator
+            connectionState={this.state.connectionState} makingOfferAnswer={this.state.makingOffer || this.state.makingAnswer} negotiationFaileMessage={this.state.negotiationFaileMessage} />
+          <button onClick={this.newPeerConnectionHandler}>New Peer Connection</button>
+          <button onClick={this.startRecordHandler} className={this.state.streamableConnection && (!this.state.recording || (this.state.recording && this.state.paused)) ? "success" : "error"}>Start Recording</button>
+          <button onClick={this.pauseRecordingHandler} className={this.state.streamableConnection && this.state.recording && !this.state.paused ? "success" : "error"}>Pause Recording</button>
+          <button onClick={this.stopRecordingHandler} className={this.state.streamableConnection && this.state.recording ? "success" : "error"}>Stop Recording</button>
+          <video autoPlay={true} muted={true} ref={this.videoRef}></video>
+        </div>
+        <p>:logs:</p>
+        {this.state.logs.map((msg, i) => <p key={i}>{i}: {msg}</p>)}
       </div>
     );
   }

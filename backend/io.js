@@ -21,7 +21,10 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 const { StreamInput } = require('fluent-ffmpeg-multistream')
 
 const io = new socketIo({
-    cors: ['*'],
+    cors: {
+        origins: ['*',],
+    },
+
 })
 
 const MEDIA_DIR = path.join(__dirname, '../media')
@@ -30,12 +33,12 @@ try {
 } catch { }
 
 const ICE_SERVERS = [
-    // {
-    //     urls: 'stun:stun.l.google.com:19302'
-    // },
-    // {
-    //     urls: 'stun:stun2.l.google.com:19302'
-    // },
+    {
+        urls: 'stun:stun.l.google.com:19302'
+    },
+    {
+        urls: 'stun:stun2.l.google.com:19302'
+    },
     // // {
     // //     urls: 'stun:stun3.l.google.com:19302'
     // // },
@@ -46,8 +49,8 @@ const ICE_SERVERS = [
 
 const DEFAULT_POLITE = false
 const DEFAULT_ICE_RESTARTS_LIMIT = 2
-const DEFAULT_OFFER_TIMEOUT = 1 * 60 * 1000
-const DEFAULT_ICE_GATHERING_TIMEOUT = 5000
+const DEFAULT_OFFER_TIMEOUT = 10 * 60 * 1000
+const DEFAULT_ICE_GATHERING_TIMEOUT = 2000
 
 const peerInfoList = []
 
@@ -119,14 +122,17 @@ io.on('connect', socket => {
             } else {
                 await peer.setRemoteDescription(description)
             }
+            console.log(`Remote Description Added`)
 
             if (description.type === 'offer') {
                 const answer = await peer.createAnswer()
                 const iceGatheringPromise = completeIceGathering()
+                console.log('Trying to add local description and find ice candidates')
                 await Promise.all([
                     iceGatheringPromise,
                     peer.setLocalDescription(answer)
                 ])
+                console.log('Local Description Added')
                 socket.emit('description', { uuid, description: peer.localDescription })
                 eventProssesingInfo.sdpAnswer = true
                 typeof cb === 'function' && cb({ info: eventProssesingInfo, data: null, success: false })
@@ -136,7 +142,8 @@ io.on('connect', socket => {
                     peerInfo.finishVideo()
                 }
             }
-        } catch {
+        } catch(err) {
+            console.log(err)
             eventProssesingInfo.serverFailure = true
             typeof cb === 'function' && cb({ info: eventProssesingInfo, data: null, success: false })
         }
