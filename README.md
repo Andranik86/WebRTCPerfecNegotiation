@@ -8,7 +8,7 @@ This is Webrtc P2p video recording example, with implemented perfect negotiation
 - Install dependencies: `npm i`
 
 ## Usage
-Copy `.env.example` file to `.env` with command `cp .env.example .env`
+Copy `./backend/.env.example` file to `./backend/.env` with command `cp ./backend/.env.example ./backend/.env`
 
 Start a server: `npm run start-back`
 
