@@ -264,11 +264,11 @@ class App extends React.Component {
         break
       case 'disconnected':
         // this.peer.restartIce()
-        this.closePeer()
+        // this.closePeer()
 
         this.setState({
           connectionState: CONNECTION_STATE.DISCONNECTED,
-          negotiationFaileMessage: 'Temporarly Disconnected: Closing Connection',
+          negotiationFaileMessage: 'Temporarly Disconnected', //: Perviously Closing Connection
           streamableConnection: false
         })
         break
