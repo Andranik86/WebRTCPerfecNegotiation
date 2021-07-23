@@ -14,7 +14,6 @@
   "license": "ISC",
   "dependencies": {
     "Frontend": "file:./frontend",
-    "Backend": "file:./backend",
-    "Converter": "file:./converter"
+    "Backend": "file:./backend"
   }
 }
