@@ -126,12 +126,7 @@ class App extends React.Component {
   lastSdpOffer = null
   offerTimer = null
 
-  socket = io(/* SERVER_URL, */ /* {
-    // withCredentials: false,
-    // mode: 'cors',
-    // origin: '*',
-    // transport: ['websocket']
-  } */)
+  socket = io(/* SERVER_URL, */)
 
   videoRef = React.createRef()
 
@@ -141,7 +136,6 @@ class App extends React.Component {
     this.setState({
       startNewConnection: true,
     })
-    // await this.newPeerConnection()
   }
 
   async componentDidUpdate(_, prevState) {
@@ -218,14 +212,11 @@ class App extends React.Component {
         streams: [],
       })
     }
-    this.log('red')
     try {
       this.setState({
         makingOffer: true,
       })
-      this.log('blue')
       const iceGatheringPromise = this.completeIceGathering()
-      this.log('bluetooth')
       const offer = await peer.createOffer()
       await Promise.all([
         iceGatheringPromise,
@@ -248,6 +239,7 @@ class App extends React.Component {
         }
       }, this.offerTimeoutValue)
     } catch (err) {
+      this.log('Error')
       this.log(err.message)
       this.setState({
         makingOffer: false,
@@ -348,11 +340,13 @@ class App extends React.Component {
 
         this.setState({ recording: false, paused: false })
         const [videoTrack] = this.mediaStream.getVideoTracks()
+        this.log(videoTrack)
         this.transceiver = await this.peer.addTransceiver(videoTrack, {
           direction: 'inactive',
           streams: [this.mediaStream],
         })
       } catch (err) {
+        this.log('Error')
         this.log(err.message)
         this.closePeer()
       }
@@ -400,6 +394,10 @@ class App extends React.Component {
       connectionState: CONNECTION_STATE.CLOSED,
 
       streamableConnection: false,
+      recording: false,
+      paused: false,
+
+      logs: [],
     })
   }
 
@@ -421,7 +419,7 @@ class App extends React.Component {
       if (!this.peer || !this.transceiver || this.transceiver.direction === 'stopped') {
         return
       }
-      if (!this.transceiver) { // peer.getTransceivers().every(transceiver => transceiver.direction === 'stopped')) {
+      if (!this.transceiver) {
         this.transceiver = await this.peer.addTransceiver('video', {
           direction: 'inactive',
           streams: [],
@@ -458,16 +456,15 @@ class App extends React.Component {
         return
       }
       this.log(`\nStop Recording: ${this.state.uuid}`)
-      // this.transceiver.direction = 'inactive'
-      // if (this.transceiver.sender.track) {
-      //   this.transceiver.sender.track.stop()
-      // }
       try {
+        // For some clients (platforms), transceiver.stop() call do not trigger negotiationneeded event,
+        // so trnsceiver is dangling around, to trigger negotiationneeded event naturaly,
+        // we first call  `transceiver.direction = 'inactive'`, and then stopping transceiver.
         this.transceiver.direction = 'inactive'
-        // this.transceiver.sender.track.stop()
         this.transceiver.stop()
         this.transceiver = null
       } catch (err) {
+        this.log('Error')
         this.log(err.message)
       }
       this.setState({ recording: false, paused: false })
@@ -475,7 +472,6 @@ class App extends React.Component {
   }
 
   render() {
-    // this.log(this.state)
     return (
       <div className="App">
         <div>
@@ -485,7 +481,7 @@ class App extends React.Component {
           <button onClick={this.startRecordHandler} className={this.state.streamableConnection && (!this.state.recording || (this.state.recording && this.state.paused)) ? "success" : "error"}>Start Recording</button>
           <button onClick={this.pauseRecordingHandler} className={this.state.streamableConnection && this.state.recording && !this.state.paused ? "success" : "error"}>Pause Recording</button>
           <button onClick={this.stopRecordingHandler} className={this.state.streamableConnection && this.state.recording ? "success" : "error"}>Stop Recording</button>
-          <video autoPlay={true} muted={true} ref={this.videoRef}></video>
+          <video playsinline={true} autoPlay={true} muted={true} ref={this.videoRef}></video>
         </div>
         <div>
           <button onClick={this.clearLogs}>Clear Logs</button>

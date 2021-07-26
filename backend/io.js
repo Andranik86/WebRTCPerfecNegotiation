@@ -307,7 +307,7 @@ io.on('connect', socket => {
             })
 
             async function negotiationNeededHandler(e) {
-                console.log(`negotiationNeeded: ${getIndexByUUID(uuid)}`)
+                console.log(`negotiationNeeded: ${uuid}`)
                 peerInfo.makingOffer = true
                 try {
                     const offer = await peer.createOffer()

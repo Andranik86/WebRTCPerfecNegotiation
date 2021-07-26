@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "npm run start-back",
     "start-front": "npm explore Frontend -- npm start",
     "start-back": "npm explore Backend -- npm start",
     "convert": "npm explore Converter -- npm start"
